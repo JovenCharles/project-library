@@ -20,7 +20,12 @@ public final class ReservationService {
     private final MemberDao memberDao;
     private final LoanDao loanDao;
 
-    public ReservationService(ReservationDao reservationDao, BookDao bookDao, MemberDao memberDao, LoanDao loanDao) {
+    public ReservationService(
+            ReservationDao reservationDao,
+            BookDao bookDao,
+            MemberDao memberDao,
+            LoanDao loanDao
+    ) {
         this.reservationDao = reservationDao;
         this.bookDao = bookDao;
         this.memberDao = memberDao;
@@ -30,7 +35,9 @@ public final class ReservationService {
     public Reservation reserve(int bookId, int memberId) throws SQLException {
         Book book = bookDao.findById(bookId);
         Member member = memberDao.findById(memberId);
-        Reservation reservation = new Reservation(member, book, LocalDate.now().toString());
+
+        Reservation reservation = new Reservation(member, book, LocalDate.now());
+
         reservationDao.create(reservation);
         return reservation;
     }
@@ -41,6 +48,7 @@ public final class ReservationService {
 
     public Loan fulfill(int reservationId) throws SQLException {
         Reservation reservation = reservationDao.findById(reservationId);
+
         if (reservation == null || reservation.isFulfilled()) {
             throw new IllegalStateException("Reservation not available");
         }
@@ -48,8 +56,16 @@ public final class ReservationService {
         reservation.setFulfilled(true);
         reservationDao.update(reservation);
 
-        String dueDate = LocalDate.now().plusDays(21).toString();
-        Loan loan = new Loan(reservation.getMember(), reservation.getBook(), LocalDate.now().toString(), dueDate);
+        LocalDate today = LocalDate.now();
+        LocalDate dueDate = today.plusDays(LoanService.DUE_DAYS);
+
+        Loan loan = new Loan(
+                reservation.getMember(),
+                reservation.getBook(),
+                today,
+                dueDate
+        );
+
         loanDao.create(loan);
         return loan;
     }
