@@ -25,10 +25,22 @@ import java.util.List;
  */
 public final class Database {
 
+    /**
+     * Logger used for database initialization and seed operations.
+     */
     private static final Logger log = LoggerFactory.getLogger(Database.class);
 
+    /**
+     * Database connection source.
+     */
     private final ConnectionSource connectionSource;
 
+    /**
+     * Creates the database connection and required tables.
+     *
+     * @param jdbcUrl the JDBC connection URL
+     * @throws SQLException if the database connection or table creation fails
+     */
     public Database(String jdbcUrl) throws SQLException {
         this.connectionSource = new JdbcConnectionSource(jdbcUrl);
 
@@ -38,12 +50,23 @@ public final class Database {
         TableUtils.createTableIfNotExists(connectionSource, Reservation.class);
     }
 
+    /**
+     * Returns the database connection source.
+     *
+     * @return the connection source
+     */
     public ConnectionSource connectionSource() {
         return connectionSource;
     }
 
+    /**
+     * Seeds the database with initial data when the corresponding tables are empty.
+     *
+     * @throws SQLException if a database operation fails
+     */
     public void seedIfEmpty() throws SQLException {
-        Dao<Book, Integer> bookDao = DaoManager.createDao(connectionSource, Book.class);
+        Dao<Book, Integer> bookDao =
+                DaoManager.createDao(connectionSource, Book.class);
 
         if (bookDao.queryForAll().isEmpty()) {
             log.debug("Seeding books");

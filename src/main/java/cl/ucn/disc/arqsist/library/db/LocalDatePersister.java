@@ -20,7 +20,8 @@ public final class LocalDatePersister extends BaseDataType {
     /**
      * Singleton instance of the persister.
      */
-    private static final LocalDatePersister SINGLETON = new LocalDatePersister();
+    private static final LocalDatePersister SINGLETON =
+            new LocalDatePersister();
 
     /**
      * Creates the LocalDate persister.
