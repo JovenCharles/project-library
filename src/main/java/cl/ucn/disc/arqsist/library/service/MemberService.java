@@ -40,7 +40,7 @@ public final class MemberService {
         bookDao.update(book);
 
         LocalDate today = LocalDate.now();
-        LocalDate dueDate = today.plusDays(LoanService.DUE_DAYS);
+        LocalDate dueDate = LoanPolicy.computeDueDate(today);
 
         Loan loan = new Loan(member, book, today, dueDate);
         loanDao.create(loan);

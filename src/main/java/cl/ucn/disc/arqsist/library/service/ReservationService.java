@@ -57,7 +57,7 @@ public final class ReservationService {
         reservationDao.update(reservation);
 
         LocalDate today = LocalDate.now();
-        LocalDate dueDate = today.plusDays(LoanService.DUE_DAYS);
+        LocalDate dueDate = LoanPolicy.computeDueDate(today);
 
         Loan loan = new Loan(
                 reservation.getMember(),
