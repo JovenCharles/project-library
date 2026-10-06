@@ -12,8 +12,6 @@ import java.util.List;
 
 public final class LoanService {
 
-    public static final int DUE_DAYS = 21;
-
     private final LoanDao loanDao;
     private final BookDao bookDao;
 
