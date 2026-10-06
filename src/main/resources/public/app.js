@@ -151,7 +151,7 @@ class LibraryApp {
                     <td>${esc(l.dueDate)}</td>
                     <td>${l.returned
                         ? '<span class="tag is-success is-light">Returned</span>'
-                        : isOverdue(1)
+                        : isOverdue(l)
                             ? '<span class="tag is-danger is-light">Overdue</span>'
                             : '<span class="tag is-warning is-light">On loan</span>'}</td>
                     <td>${l.overdueFee > 0

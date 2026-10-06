@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026. Arquitectura de Sistemas, DISC, UCN, Antofagasta.
+ */
+
 package cl.ucn.disc.arqsist.library;
 
 import cl.ucn.disc.arqsist.library.controller.BookController;
@@ -16,8 +20,17 @@ import cl.ucn.disc.arqsist.library.service.ReservationService;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
 
+/**
+ * Application entry point for the library system.
+ */
 public final class App {
 
+    /**
+     * Starts the application, initializes dependencies, and launches the web server.
+     *
+     * @param args command-line arguments
+     * @throws Exception if the database or server initialization fails
+     */
     public static void main(String[] args) throws Exception {
         Database db = new Database("jdbc:sqlite:database.sqlite");
         db.seedIfEmpty();
@@ -25,17 +38,37 @@ public final class App {
         BookDao bookDao = new BookDao(db.connectionSource());
         MemberDao memberDao = new MemberDao(db.connectionSource());
         LoanDao loanDao = new LoanDao(db.connectionSource());
-        ReservationDao reservationDao = new ReservationDao(db.connectionSource());
+        ReservationDao reservationDao =
+                new ReservationDao(db.connectionSource());
 
-        BookService bookService = new BookService(bookDao);
-        MemberService memberService = new MemberService(memberDao, bookDao, loanDao);
-        LoanService loanService = new LoanService(loanDao, bookDao);
-        ReservationService reservationService = new ReservationService(reservationDao, bookDao, memberDao, loanDao);
+        BookService bookService =
+                new BookService(bookDao);
 
-        BookController bookController = new BookController(bookService, bookDao);
-        MemberController memberController = new MemberController(memberService);
-        LoanController loanController = new LoanController(memberService, loanService);
-        ReservationController reservationController = new ReservationController(reservationService);
+        MemberService memberService =
+                new MemberService(memberDao, bookDao, loanDao);
+
+        LoanService loanService =
+                new LoanService(loanDao, bookDao);
+
+        ReservationService reservationService =
+                new ReservationService(
+                        reservationDao,
+                        bookDao,
+                        memberDao,
+                        loanDao
+                );
+
+        BookController bookController =
+                new BookController(bookService, bookDao);
+
+        MemberController memberController =
+                new MemberController(memberService);
+
+        LoanController loanController =
+                new LoanController(memberService, loanService);
+
+        ReservationController reservationController =
+                new ReservationController(reservationService);
 
         Javalin.create(config -> {
             config.staticFiles.add(staticFiles -> {
@@ -43,10 +76,12 @@ public final class App {
                 staticFiles.directory = "/public";
                 staticFiles.location = Location.CLASSPATH;
             });
+
             bookController.register(config);
             memberController.register(config);
             loanController.register(config);
             reservationController.register(config);
+
         }).start(7070);
     }
 }
