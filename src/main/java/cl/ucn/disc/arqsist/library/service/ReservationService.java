@@ -4,7 +4,6 @@
 
 package cl.ucn.disc.arqsist.library.service;
 
-import cl.ucn.disc.arqsist.library.dao.BookDao;
 import cl.ucn.disc.arqsist.library.dao.LoanDao;
 import cl.ucn.disc.arqsist.library.dao.MemberDao;
 import cl.ucn.disc.arqsist.library.dao.ReservationDao;
@@ -14,6 +13,7 @@ import cl.ucn.disc.arqsist.library.model.Member;
 import cl.ucn.disc.arqsist.library.model.Reservation;
 
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -28,11 +28,6 @@ public final class ReservationService {
     private final ReservationDao reservationDao;
 
     /**
-     * DAO used to access book data.
-     */
-    private final BookDao bookDao;
-
-    /**
      * DAO used to access member data.
      */
     private final MemberDao memberDao;
@@ -43,23 +38,36 @@ public final class ReservationService {
     private final LoanDao loanDao;
 
     /**
+     * Service used to manage books and inventory.
+     */
+    private final BookService bookService;
+
+    /**
+     * Clock used to obtain the current date.
+     */
+    private final Clock clock;
+
+    /**
      * Creates the reservation service.
      *
      * @param reservationDao the reservation DAO
-     * @param bookDao the book DAO
      * @param memberDao the member DAO
      * @param loanDao the loan DAO
+     * @param bookService the book service
+     * @param clock the clock used to obtain the current date
      */
     public ReservationService(
             ReservationDao reservationDao,
-            BookDao bookDao,
             MemberDao memberDao,
-            LoanDao loanDao
+            LoanDao loanDao,
+            BookService bookService,
+            Clock clock
     ) {
         this.reservationDao = reservationDao;
-        this.bookDao = bookDao;
         this.memberDao = memberDao;
         this.loanDao = loanDao;
+        this.bookService = bookService;
+        this.clock = clock;
     }
 
     /**
@@ -68,19 +76,33 @@ public final class ReservationService {
      * @param bookId the book identifier
      * @param memberId the member identifier
      * @return the created reservation
-     * @throws SQLException if the database operation fails
+     * @throws NotFoundException if the book or member does not exist
      */
-    public Reservation reserve(int bookId, int memberId) throws SQLException {
-        Book book = bookDao.findById(bookId);
+    public Reservation reserve(int bookId, int memberId) {
+        Book book = bookService.findById(bookId);
+
+        if (book == null) {
+            throw new NotFoundException(
+                    "Book not found: " + bookId
+            );
+        }
+
         Member member = memberDao.findById(memberId);
+
+        if (member == null) {
+            throw new NotFoundException(
+                    "Member not found: " + memberId
+            );
+        }
 
         Reservation reservation = new Reservation(
                 member,
                 book,
-                LocalDate.now()
+                LocalDate.now(clock)
         );
 
         reservationDao.create(reservation);
+
         return reservation;
     }
 
@@ -88,41 +110,58 @@ public final class ReservationService {
      * Returns all reservations.
      *
      * @return the list of reservations
-     * @throws SQLException if the database operation fails
      */
-    public List<Reservation> findAll() throws SQLException {
+    public List<Reservation> findAll() {
         return reservationDao.findAll();
     }
 
     /**
-     * Fulfills a reservation and creates a loan.
+     * Fulfills a reservation and creates the corresponding loan.
      *
      * @param reservationId the reservation identifier
      * @return the created loan
-     * @throws IllegalStateException if the reservation does not exist or was already fulfilled
-     * @throws SQLException if the database operation fails
+     * @throws SQLException if the transaction cannot be completed
+     * @throws NotFoundException if the reservation does not exist
+     * @throws IllegalStateException if the reservation was already fulfilled
      */
     public Loan fulfill(int reservationId) throws SQLException {
-        Reservation reservation = reservationDao.findById(reservationId);
+        Reservation reservation =
+                reservationDao.findById(reservationId);
 
-        if (reservation == null || reservation.isFulfilled()) {
-            throw new IllegalStateException("Reservation not available");
+        if (reservation == null) {
+            throw new NotFoundException(
+                    "Reservation not found: " + reservationId
+            );
         }
 
-        reservation.setFulfilled(true);
-        reservationDao.update(reservation);
+        if (reservation.isFulfilled()) {
+            throw new IllegalStateException(
+                    "Reservation already fulfilled: " + reservationId
+            );
+        }
 
-        LocalDate today = LocalDate.now();
-        LocalDate dueDate = LoanPolicy.computeDueDate(today);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate dueDate =
+                LoanPolicy.computeDueDate(today);
 
-        Loan loan = new Loan(
-                reservation.getMember(),
-                reservation.getBook(),
-                today,
-                dueDate
-        );
+        return reservationDao.transaction(() -> {
+            reservation.setFulfilled(true);
+            reservationDao.update(reservation);
 
-        loanDao.create(loan);
-        return loan;
+            bookService.borrow(
+                    reservation.getBook().getId()
+            );
+
+            Loan loan = new Loan(
+                    reservation.getMember(),
+                    reservation.getBook(),
+                    today,
+                    dueDate
+            );
+
+            loanDao.create(loan);
+
+            return loan;
+        });
     }
 }

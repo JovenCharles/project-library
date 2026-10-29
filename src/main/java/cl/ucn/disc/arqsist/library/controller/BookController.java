@@ -4,7 +4,6 @@
 
 package cl.ucn.disc.arqsist.library.controller;
 
-import cl.ucn.disc.arqsist.library.dao.BookDao;
 import cl.ucn.disc.arqsist.library.model.Book;
 import cl.ucn.disc.arqsist.library.service.BookService;
 import io.javalin.config.JavalinConfig;
@@ -20,19 +19,12 @@ public final class BookController {
     private final BookService service;
 
     /**
-     * DAO used to access book data.
-     */
-    private final BookDao dao;
-
-    /**
      * Creates the book controller.
      *
      * @param service the book service
-     * @param dao the book DAO
      */
-    public BookController(BookService service, BookDao dao) {
+    public BookController(BookService service) {
         this.service = service;
-        this.dao = dao;
     }
 
     /**
@@ -43,7 +35,7 @@ public final class BookController {
     public void register(JavalinConfig config) {
         config.routes.get(
                 "/books",
-                ctx -> ctx.json(dao.findAll())
+                ctx -> ctx.json(service.listAll())
         );
 
         config.routes.get(

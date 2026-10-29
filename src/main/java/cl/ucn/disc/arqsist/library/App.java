@@ -16,14 +16,29 @@ import cl.ucn.disc.arqsist.library.db.Database;
 import cl.ucn.disc.arqsist.library.service.BookService;
 import cl.ucn.disc.arqsist.library.service.LoanService;
 import cl.ucn.disc.arqsist.library.service.MemberService;
+import cl.ucn.disc.arqsist.library.service.NotFoundException;
 import cl.ucn.disc.arqsist.library.service.ReservationService;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
+import io.javalin.json.JavalinJackson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.Map;
 
 /**
  * Application entry point for the library system.
  */
 public final class App {
+
+    /**
+     * Logger used for application startup and wiring.
+     */
+    private static final Logger log =
+            LoggerFactory.getLogger(App.class);
 
     /**
      * Starts the application, initializes dependencies, and launches the web server.
@@ -32,45 +47,84 @@ public final class App {
      * @throws Exception if the database or server initialization fails
      */
     public static void main(String[] args) throws Exception {
-        Database db = new Database("jdbc:sqlite:database.sqlite");
+
+        log.info("Starting library application");
+
+        Database db =
+                new Database("jdbc:sqlite:database.db");
+
+        log.info("Seeding database");
         db.seedIfEmpty();
 
-        BookDao bookDao = new BookDao(db.connectionSource());
-        MemberDao memberDao = new MemberDao(db.connectionSource());
-        LoanDao loanDao = new LoanDao(db.connectionSource());
+        log.info("Creating DAOs");
+
+        BookDao bookDao =
+                new BookDao(db.connectionSource());
+
+        MemberDao memberDao =
+                new MemberDao(db.connectionSource());
+
+        LoanDao loanDao =
+                new LoanDao(db.connectionSource());
+
         ReservationDao reservationDao =
                 new ReservationDao(db.connectionSource());
+
+        Clock clock =
+                Clock.system(
+                        ZoneId.of("America/Santiago")
+                );
+
+        log.info("Creating services");
 
         BookService bookService =
                 new BookService(bookDao);
 
         MemberService memberService =
-                new MemberService(memberDao, bookDao, loanDao);
+                new MemberService(memberDao);
 
         LoanService loanService =
-                new LoanService(loanDao, bookDao);
+                new LoanService(
+                        loanDao,
+                        memberDao,
+                        bookService,
+                        clock
+                );
 
         ReservationService reservationService =
                 new ReservationService(
                         reservationDao,
-                        bookDao,
                         memberDao,
-                        loanDao
+                        loanDao,
+                        bookService,
+                        clock
                 );
 
+        log.info("Creating controllers");
+
         BookController bookController =
-                new BookController(bookService, bookDao);
+                new BookController(bookService);
 
         MemberController memberController =
                 new MemberController(memberService);
 
         LoanController loanController =
-                new LoanController(memberService, loanService);
+                new LoanController(loanService);
 
         ReservationController reservationController =
                 new ReservationController(reservationService);
 
-        Javalin.create(config -> {
+        Javalin app = Javalin.create(config -> {
+
+            config.jsonMapper(
+                    new JavalinJackson()
+                            .updateMapper(mapper ->
+                                    mapper.disable(
+                                            SerializationFeature.WRITE_DATES_AS_TIMESTAMPS
+                                    )
+                            )
+            );
+
             config.staticFiles.add(staticFiles -> {
                 staticFiles.hostedPath = "/";
                 staticFiles.directory = "/public";
@@ -82,6 +136,45 @@ public final class App {
             loanController.register(config);
             reservationController.register(config);
 
-        }).start(7070);
+            config.routes.exception(
+                    NotFoundException.class,
+                    (e, ctx) ->
+                            ctx.status(404)
+                                    .json(
+                                            Map.of(
+                                                    "error",
+                                                    e.getMessage()
+                                            )
+                                    )
+            );
+
+            config.routes.exception(
+                    IllegalArgumentException.class,
+                    (e, ctx) ->
+                            ctx.status(400)
+                                    .json(
+                                            Map.of(
+                                                    "error",
+                                                    e.getMessage()
+                                            )
+                                    )
+            );
+
+            config.routes.exception(
+                    IllegalStateException.class,
+                    (e, ctx) ->
+                            ctx.status(409)
+                                    .json(
+                                            Map.of(
+                                                    "error",
+                                                    e.getMessage()
+                                            )
+                                    )
+            );
+        });
+
+        log.info("Starting server on port 7070");
+
+        app.start(7070);
     }
 }

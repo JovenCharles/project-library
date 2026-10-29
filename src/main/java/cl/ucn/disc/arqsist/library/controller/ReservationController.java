@@ -7,8 +7,6 @@ package cl.ucn.disc.arqsist.library.controller;
 import cl.ucn.disc.arqsist.library.service.ReservationService;
 import io.javalin.config.JavalinConfig;
 
-import java.util.Objects;
-
 /**
  * Registers HTTP routes related to reservations.
  */
@@ -36,15 +34,11 @@ public final class ReservationController {
     public void register(JavalinConfig config) {
         config.routes.post("/reservations", ctx -> {
             int memberId = Integer.parseInt(
-                    Objects.requireNonNull(
-                            ctx.queryParam("memberId")
-                    )
+                    ctx.queryParam("memberId")
             );
 
             int bookId = Integer.parseInt(
-                    Objects.requireNonNull(
-                            ctx.queryParam("bookId")
-                    )
+                    ctx.queryParam("bookId")
             );
 
             ctx.json(
