@@ -3,7 +3,6 @@
 ' Layered: controller -> service -> dao -> model (persistence via ORMLite)
 
 skin rose
-' left to right direction
 
 skinparam package<<controller>> {
   BackgroundColor #FCE4EC
@@ -30,12 +29,10 @@ hide stereotype
 package "controller" <<controller>> {
   class BookController {
     - BookService service
-    - BookDao dao
     + register(JavalinConfig) : void
   }
 
   class LoanController {
-    - MemberService memberService
     - LoanService loanService
     + register(JavalinConfig) : void
   }
@@ -63,10 +60,15 @@ package "service" <<service>> {
 
   class LoanService {
     - LoanDao loanDao
-    - BookDao bookDao
+    - MemberDao memberDao
+    - BookService bookService
+    - Clock clock
+    + checkout(int, int) : Loan
     + findAll() : List<Loan>
     + returnLoan(int) : Loan
     + overdueLoans() : List<Loan>
+    - withAccruedFees(List<Loan>) : List<Loan>
+    - accruedFee(Loan) : double
   }
 
   class LoanPolicy {
@@ -78,18 +80,16 @@ package "service" <<service>> {
 
   class MemberService {
     - MemberDao memberDao
-    - BookDao bookDao
-    - LoanDao loanDao
     + register(Member) : Member
     + findAll() : List<Member>
-    + checkout(int, int) : Loan
   }
 
   class ReservationService {
     - ReservationDao reservationDao
-    - BookDao bookDao
     - MemberDao memberDao
     - LoanDao loanDao
+    - BookService bookService
+    - Clock clock
     + reserve(int, int) : Reservation
     + findAll() : List<Reservation>
     + fulfill(int) : Loan
@@ -238,26 +238,28 @@ package "db" <<db>> {
 
 ' ----- controller -> service -----
 BookController "1" --> "1" BookService
-BookController "1" --> "1" BookDao
-LoanController "1" --> "1" MemberService
 LoanController "1" --> "1" LoanService
 MemberController "1" --> "1" MemberService
 ReservationController "1" --> "1" ReservationService
 
-' ----- service -> dao -----
+' ----- service dependencies -----
 BookService "1" --> "1" BookDao
+
 LoanService "1" --> "1" LoanDao
-LoanService "1" --> "1" BookDao
+LoanService "1" --> "1" MemberDao
+LoanService "1" --> "1" BookService
+LoanService --> Clock
+
 MemberService "1" --> "1" MemberDao
-MemberService "1" --> "1" BookDao
-MemberService "1" --> "1" LoanDao
+
 ReservationService "1" --> "1" ReservationDao
-ReservationService "1" --> "1" BookDao
 ReservationService "1" --> "1" MemberDao
 ReservationService "1" --> "1" LoanDao
+ReservationService "1" --> "1" BookService
+ReservationService --> Clock
 
 ' ----- service -> policy -----
-MemberService ..> LoanPolicy : <<uses>>
+LoanService ..> LoanPolicy : <<uses>>
 ReservationService ..> LoanPolicy : <<uses>>
 
 ' ----- dao inheritance -----
