@@ -171,4 +171,34 @@ public final class MemberGrpcService
                 .setEmail(member.getEmail())
                 .build();
     }
+    /**
+     * Searches members by a name fragment.
+     *
+     * @param request the search request
+     * @param observer the reply observer
+     */
+    @Override
+    public void searchMembers(
+            SearchMembersRequest request,
+            StreamObserver<ListMembersReply> observer
+    ) {
+        try {
+            List<MemberMessage> members =
+                    memberService.search(request.getQuery())
+                            .stream()
+                            .map(MemberGrpcService::toMessage)
+                            .toList();
+
+            observer.onNext(
+                    ListMembersReply.newBuilder()
+                            .addAllMembers(members)
+                            .build()
+            );
+
+            observer.onCompleted();
+
+        } catch (RuntimeException e) {
+            observer.onError(toError(e));
+        }
+    }
 }
